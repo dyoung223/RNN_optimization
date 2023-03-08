@@ -237,12 +237,22 @@ public:
 static Matrix<float>
 fused_add_broadcast_add_second_unary_op(const MatrixView<float>& m1, const MatrixView<float>& m2, const VectorView<float>& v, float(*op)(float))
 {
+    static const int unroll = 10;
     assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
     Matrix<float> m3(m1.rows(), m1.cols());
 
     for (size_t i = 0; i < m1.rows(); i ++) {
-        for (size_t j = 0; j < m1.cols(); j ++) {
+        for (size_t j = 0; j < m1.cols(); j += unroll) {
             m3.at(i, j) = op(m1.at(i, j) + m2.at(i, j) + v.at(j));
+            m3.at(i, j+1) = op(m1.at(i, j+1) + m2.at(i, j+1) + v.at(j+1));
+            m3.at(i, j+2) = op(m1.at(i, j+2) + m2.at(i, j+2) + v.at(j+2));
+            m3.at(i, j+3) = op(m1.at(i, j+3) + m2.at(i, j+3) + v.at(j+3));
+            m3.at(i, j+4) = op(m1.at(i, j+4) + m2.at(i, j+4) + v.at(j+4));
+            m3.at(i, j+5) = op(m1.at(i, j+5) + m2.at(i, j+5) + v.at(j+5));
+            m3.at(i, j+6) = op(m1.at(i, j+6) + m2.at(i, j+6) + v.at(j+6));
+            m3.at(i, j+7) = op(m1.at(i, j+7) + m2.at(i, j+7) + v.at(j+7));
+            m3.at(i, j+8) = op(m1.at(i, j+8) + m2.at(i, j+8) + v.at(j+8));
+            m3.at(i, j+9) = op(m1.at(i, j+9) + m2.at(i, j+9) + v.at(j+9));
         }
     }
 
