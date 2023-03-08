@@ -479,10 +479,14 @@ void parallel_lstm(const Matrix<float>& weights, const std::vector<float>& biase
     Matrix<float> m3 = Matrix<float>(h.rows(), Wf.cols());
     Matrix<float> m5 = Matrix<float>(h.rows(), Wf.cols());
     Matrix<float> m7 = Matrix<float>(h.rows(), Wf.cols());
+    m1.set_zero();
+    m3.set_zero();
+    m5.set_zero();
+    m7.set_zero();
 
     const int BLOCK_SIZE = 16;
 
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for collapse(3)
     for (size_t i = 0; i < h.rows(); i += BLOCK_SIZE) {
         for (size_t j = 0; j < Wf.cols(); j += BLOCK_SIZE) {
             for (size_t k = 0; k < Wf.rows(); k ++) {
@@ -503,8 +507,12 @@ void parallel_lstm(const Matrix<float>& weights, const std::vector<float>& biase
     Matrix<float> m4 = Matrix<float>(x.rows(), Uf.cols()); 
     Matrix<float> m6 = Matrix<float>(x.rows(), Uf.cols()); 
     Matrix<float> m8 = Matrix<float>(x.rows(), Uf.cols()); 
+    m2.set_zero();
+    m4.set_zero();
+    m6.set_zero();
+    m8.set_zero();
 
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for collapse(3)
     for (size_t i = 0; i < x.rows(); i += BLOCK_SIZE) {
         for (size_t j = 0; j < Uf.cols(); j += BLOCK_SIZE) {
             for (size_t k = 0; k < Uf.rows(); k ++) {
@@ -521,7 +529,7 @@ void parallel_lstm(const Matrix<float>& weights, const std::vector<float>& biase
         }
     }
 
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for collapse(1)
     for (size_t i = 0; i < m1.rows(); i ++) {
         for (size_t j = 0; j < m1.cols(); j += 1) {
             float f = sigmoid_in(m1.at(i,j) + m2.at(i,j) + bf.at(j));
@@ -572,8 +580,8 @@ int main(int argc, const char** argv)
 
         
         // kernel_lstm(weights, biases, x, h, c, k_hprime, k_cprime);
-        serial_lstm(weights, biases, x, h, c, hprime, cprime);
-        //parallel_lstm(weights, biases, x, h, c, hprime, cprime);
+        //serial_lstm(weights, biases, x, h, c, hprime, cprime);
+        parallel_lstm(weights, biases, x, h, c, hprime, cprime);
         
         // for(int rows = 0; rows < hprime.rows(); rows++){
         //     for(int cols = 0; cols < hprime.cols(); cols++){
