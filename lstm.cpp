@@ -234,87 +234,6 @@ public:
 
 // Add any constant, define, class or struct type that you find useful
 
-static Matrix<float>
-serial_matmul(const MatrixView<float>& m1, const MatrixView<float>& m2)
-{
-    static const int BLOCK_SIZE = 16;
-
-    assert(m1.cols() == m2.rows());
-    Matrix<float> m3(m1.rows(), m2.cols());
-    m3.set_zero();
-
-    for (size_t i = 0; i < m1.rows(); i += BLOCK_SIZE) {
-        for (size_t j = 0; j < m2.cols(); j += BLOCK_SIZE) {
-            for (size_t k = 0; k < m2.rows(); k ++) {
-                for (size_t ii = i; ii < std::min(m1.rows(), i+BLOCK_SIZE); ii++) {
-                    //for (size_t jj = j; jj < std::min(m2.cols(), j+BLOCK_SIZE); jj++) {
-                    //this unrolling depends on BLOCK_SIZE above
-                    m3.at(ii, j) += m1.at(ii, k) * m2.at(k, j);
-                    m3.at(ii, j+1) += m1.at(ii, k) * m2.at(k, j+1);
-                    m3.at(ii, j+2) += m1.at(ii, k) * m2.at(k, j+2);
-                    m3.at(ii, j+3) += m1.at(ii, k) * m2.at(k, j+3);
-                    m3.at(ii, j+4) += m1.at(ii, k) * m2.at(k, j+4);
-                    m3.at(ii, j+5) += m1.at(ii, k) * m2.at(k, j+5);
-                    m3.at(ii, j+6) += m1.at(ii, k) * m2.at(k, j+6);
-                    m3.at(ii, j+7) += m1.at(ii, k) * m2.at(k, j+7);
-                    m3.at(ii, j+8) += m1.at(ii, k) * m2.at(k, j+8);
-                    m3.at(ii, j+9) += m1.at(ii, k) * m2.at(k, j+9);
-                    m3.at(ii, j+10) += m1.at(ii, k) * m2.at(k, j+10);
-                    m3.at(ii, j+11) += m1.at(ii, k) * m2.at(k, j+11);
-                    m3.at(ii, j+12) += m1.at(ii, k) * m2.at(k, j+12);
-                    m3.at(ii, j+13) += m1.at(ii, k) * m2.at(k, j+13);
-                    m3.at(ii, j+14) += m1.at(ii, k) * m2.at(k, j+14);
-                    m3.at(ii, j+15) += m1.at(ii, k) * m2.at(k, j+15);
-                    //}
-                }
-            }
-        }
-    }
-
-    return m3;
-}
-static Matrix<float>
-serial_cwise_add(const MatrixView<float>& m1, const MatrixView<float>& m2)
-{
-    assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
-    Matrix<float> m3(m1.rows(), m1.cols());
-
-    for (size_t i = 0; i < m1.rows(); i ++) {
-        for (size_t j = 0; j < m1.cols(); j ++) {
-            m3.at(i, j) = m1.at(i, j) + m2.at(i, j);
-        }
-    }
-
-    return m3;
-}
-
-static Matrix<float>
-serial_cwise_mul(const MatrixView<float>& m1, const MatrixView<float>& m2)
-{
-    assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
-    Matrix<float> m3(m1.rows(), m1.cols());
-
-    for (size_t i = 0; i < m1.rows(); i ++) {
-        for (size_t j = 0; j < m1.cols(); j ++) {
-            m3.at(i, j) = m1.at(i, j) * m2.at(i, j);
-        }
-    }
-
-    return m3;
-}
-static Matrix<float>
-serial_cwise_unary_op(const MatrixView<float>& m, float(*op)(float))
-{
-    Matrix<float> m2(m.rows(), m.cols());
-
-    for (size_t i = 0; i < m.rows(); i ++) {
-        for (size_t j = 0; j < m.cols(); j ++) {
-            m2.at(i, j) = op(m.at(i, j));
-        }
-    }
-
-    return m2;
-}
 // (optional) END YOUR CODE HERE
 
 static Matrix<float>
@@ -326,7 +245,7 @@ matmul(const MatrixView<float>& m1, const MatrixView<float>& m2)
     Matrix<float> m3(m1.rows(), m2.cols());
     m3.set_zero();
 
-//#pragma omp parallel for collapse(2)
+#pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m1.rows(); i += BLOCK_SIZE) {
         for (size_t j = 0; j < m2.cols(); j += BLOCK_SIZE) {
             for (size_t k = 0; k < m2.rows(); k ++) {
@@ -346,7 +265,7 @@ cwise_unary_op(const MatrixView<float>& m, float(*op)(float))
 {
     Matrix<float> m2(m.rows(), m.cols());
 
-//#pragma omp parallel for collapse(2)
+#pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m.rows(); i ++) {
         for (size_t j = 0; j < m.cols(); j ++) {
             m2.at(i, j) = op(m.at(i, j));
@@ -361,7 +280,7 @@ cwise_add(const MatrixView<float>& m1, const MatrixView<float>& m2)
     assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
     Matrix<float> m3(m1.rows(), m1.cols());
 
-//#pragma omp parallel for collapse(2)
+#pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m1.rows(); i ++) {
         for (size_t j = 0; j < m1.cols(); j ++) {
             m3.at(i, j) = m1.at(i, j) + m2.at(i, j);
@@ -376,7 +295,7 @@ cwise_mul(const MatrixView<float>& m1, const MatrixView<float>& m2)
     assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
     Matrix<float> m3(m1.rows(), m1.cols());
 
-//#pragma omp parallel for collapse(2)
+#pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m1.rows(); i ++) {
         for (size_t j = 0; j < m1.cols(); j ++) {
             m3.at(i, j) = m1.at(i, j) * m2.at(i, j);
@@ -393,7 +312,7 @@ broadcast_add_second(const MatrixView<float>& m, const VectorView<float>& v)
     assert(m.cols() == v.size());
     Matrix<float> m2(m.rows(), m.cols());
 
-//#pragma omp parallel for collapse(2)
+#pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m.rows(); i ++) {
         for (size_t j = 0; j < m.cols(); j ++) {
             m2.at(i, j) = m.at(i, j) + v.at(j);
@@ -478,14 +397,10 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
     // assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
     // Matrix<float> m3(m1.rows(), m1.cols());
 
-    Matrix<float> m1 = serial_matmul(h, Wf);
-    Matrix<float> m2 = serial_matmul(x, Uf);
-    Matrix<float> m3 = serial_matmul(h, Wi);
-    Matrix<float> m4 = serial_matmul(x, Ui);
-    Matrix<float> m5 = serial_matmul(h, Wc);
-    Matrix<float> m6 = serial_matmul(x, Uc);
-    Matrix<float> m7 = serial_matmul(h, Wc);
-    Matrix<float> m8 = serial_matmul(h, Uc);
+    Matrix<float> m1 = Matrix<float>(h.rows(), Wf.cols());
+    Matrix<float> m3 = Matrix<float>(h.rows(), Wf.cols());
+    Matrix<float> m5 = Matrix<float>(h.rows(), Wf.cols());
+    Matrix<float> m7 = Matrix<float>(h.rows(), Wf.cols());
 
     const int BLOCK_SIZE = 16;
     for (size_t i = 0; i < h.rows(); i += BLOCK_SIZE) {
@@ -493,26 +408,32 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
             for (size_t k = 0; k < Wf.rows(); k ++) {
                 for (size_t ii = i; ii < std::min(h.rows(), i+BLOCK_SIZE); ii++) {
                     for (size_t jj = j; jj < std::min(Wf.cols(), j+BLOCK_SIZE); jj++) {
-                        m1.at(ii, jj) += h.at(ii, k) * Wf.at(k, jj);
-                        m3.at(ii, jj) += h.at(ii, k) * Wi.at(k, jj);
-                        m5.at(ii, jj) += h.at(ii, k) * Wo.at(k, jj);
-                        m7.at(ii, jj) += h.at(ii, k) * Wc.at(k, jj);
+                        float hval = h.at(ii,k);
+                        m1.at(ii, jj) += hval * Wf.at(k, jj);
+                        m3.at(ii, jj) += hval * Wi.at(k, jj);
+                        m5.at(ii, jj) += hval * Wo.at(k, jj);
+                        m7.at(ii, jj) += hval * Wc.at(k, jj);
                     }
                 }
             }
         }
     }
     
+    Matrix<float> m2 = Matrix<float>(x.rows(), Uf.cols()); 
+    Matrix<float> m4 = Matrix<float>(x.rows(), Uf.cols()); 
+    Matrix<float> m6 = Matrix<float>(x.rows(), Uf.cols()); 
+    Matrix<float> m8 = Matrix<float>(x.rows(), Uf.cols()); 
 
     for (size_t i = 0; i < x.rows(); i += BLOCK_SIZE) {
         for (size_t j = 0; j < Uf.cols(); j += BLOCK_SIZE) {
             for (size_t k = 0; k < Uf.rows(); k ++) {
                 for (size_t ii = i; ii < std::min(x.rows(), i+BLOCK_SIZE); ii++) {
                     for (size_t jj = j; jj < std::min(Uf.cols(), j+BLOCK_SIZE); jj++) {
-                        m2.at(ii, jj) += x.at(ii, k) * Uf.at(k, jj);
-                        m4.at(ii, jj) += x.at(ii, k) * Ui.at(k, jj);
-                        m6.at(ii, jj) += x.at(ii, k) * Uo.at(k, jj);
-                        m8.at(ii, jj) += x.at(ii, k) * Uc.at(k, jj);
+                        float xval = x.at(ii, k);
+                        m2.at(ii, jj) += xval * Uf.at(k, jj);
+                        m4.at(ii, jj) += xval * Ui.at(k, jj);
+                        m6.at(ii, jj) += xval * Uo.at(k, jj);
+                        m8.at(ii, jj) += xval * Uc.at(k, jj);
                     }
                 }
             }
