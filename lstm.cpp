@@ -452,7 +452,79 @@ void parallel_lstm(const Matrix<float>& weights, const std::vector<float>& biase
 {
 // BEGIN YOUR CODE HERE
 
-// Write the parallel implementation of LSTM here
+    size_t xsize = x.cols();
+    size_t hsize = h.cols();
+    const MatrixView<float> Wf(weights, 0, 0, hsize, hsize);
+    const MatrixView<float> Wi(weights, 0, hsize, hsize, hsize);
+    const MatrixView<float> Wo(weights, 0, 2*hsize, hsize, hsize);
+    const MatrixView<float> Wc(weights, 0, 3*hsize, hsize, hsize);
+    const MatrixView<float> Uf(weights, hsize, 0, xsize, hsize);
+    const MatrixView<float> Ui(weights, hsize, hsize, xsize, hsize);
+    const MatrixView<float> Uo(weights, hsize, 2*hsize, xsize, hsize);
+    const MatrixView<float> Uc(weights, hsize, 3*hsize, xsize, hsize);
+    const VectorView<float> bf(biases, 0, hsize);
+    const VectorView<float> bi(biases, hsize, hsize);
+    const VectorView<float> bo(biases, 2*hsize, hsize);
+    const VectorView<float> bc(biases, 3*hsize, hsize);
+
+    Matrix<float> m1 = Matrix<float>(h.rows(), Wf.cols());
+    Matrix<float> m3 = Matrix<float>(h.rows(), Wf.cols());
+    Matrix<float> m5 = Matrix<float>(h.rows(), Wf.cols());
+    Matrix<float> m7 = Matrix<float>(h.rows(), Wf.cols());
+
+    const int BLOCK_SIZE = 16;
+
+#pragma omp parallel for collapse(2)
+    for (size_t i = 0; i < h.rows(); i += BLOCK_SIZE) {
+        for (size_t j = 0; j < Wf.cols(); j += BLOCK_SIZE) {
+            for (size_t k = 0; k < Wf.rows(); k ++) {
+                for (size_t ii = i; ii < std::min(h.rows(), i+BLOCK_SIZE); ii++) {
+                    float hval = h.at(ii,k);
+                    for (size_t jj = j; jj < std::min(Wf.cols(), j+BLOCK_SIZE); jj++) {
+                        m1.at(ii, jj) += hval * Wf.at(k, jj);
+                        m3.at(ii, jj) += hval * Wi.at(k, jj);
+                        m5.at(ii, jj) += hval * Wo.at(k, jj);
+                        m7.at(ii, jj) += hval * Wc.at(k, jj);
+                    }
+                }
+            }
+        }
+    }
+    
+    Matrix<float> m2 = Matrix<float>(x.rows(), Uf.cols()); 
+    Matrix<float> m4 = Matrix<float>(x.rows(), Uf.cols()); 
+    Matrix<float> m6 = Matrix<float>(x.rows(), Uf.cols()); 
+    Matrix<float> m8 = Matrix<float>(x.rows(), Uf.cols()); 
+
+#pragma omp parallel for collapse(2)
+    for (size_t i = 0; i < x.rows(); i += BLOCK_SIZE) {
+        for (size_t j = 0; j < Uf.cols(); j += BLOCK_SIZE) {
+            for (size_t k = 0; k < Uf.rows(); k ++) {
+                for (size_t ii = i; ii < std::min(x.rows(), i+BLOCK_SIZE); ii++) {
+                    float xval = x.at(ii, k);
+                    for (size_t jj = j; jj < std::min(Uf.cols(), j+BLOCK_SIZE); jj++) {
+                        m2.at(ii, jj) += xval * Uf.at(k, jj);
+                        m4.at(ii, jj) += xval * Ui.at(k, jj);
+                        m6.at(ii, jj) += xval * Uo.at(k, jj);
+                        m8.at(ii, jj) += xval * Uc.at(k, jj);
+                    }
+                }
+            }
+        }
+    }
+
+#pragma omp parallel for collapse(2)
+    for (size_t i = 0; i < m1.rows(); i ++) {
+        for (size_t j = 0; j < m1.cols(); j += 1) {
+            float f = sigmoid_in(m1.at(i,j) + m2.at(i,j) + bf.at(j));
+            float i_ = sigmoid_in(m3.at(i,j) + m4.at(i,j) + bi.at(j));
+            float tmp = std::tanh(m7.at(i,j) + m8.at(i,j) + bc.at(j));
+            float cp = f*c.at(i,j) + i_*tmp;
+            cprime.at(i,j) = cp;
+            float o = sigmoid_in(m5.at(i,j) + m6.at(i,j) + bo.at(j));
+            hprime.at(i,j) = o * std::tanh(cp);
+        }
+    }
 
 // END YOUR CODE HERE
 }
@@ -485,12 +557,24 @@ int main(int argc, const char** argv)
         const Matrix<float> c = generate_matrix<float>(batchsize, hsize, distribution, random_engine);
         Matrix<float> hprime(batchsize, hsize);
         Matrix<float> cprime(batchsize, hsize);
+        Matrix<float> k_hprime(batchsize, hsize);
+        Matrix<float> k_cprime(batchsize, hsize);
 
         Timer tm(CLOCK_MONOTONIC);
 
-        //kernel_lstm(weights, biases, x, h, c, hprime, cprime);
-        serial_lstm(weights, biases, x, h, c, hprime, cprime);
         
+        kernel_lstm(weights, biases, x, h, c, k_hprime, k_cprime);
+        serial_lstm(weights, biases, x, h, c, hprime, cprime);
+        //parallel_lstm(weights, biases, x, h, c, hprime, cprime);
+        
+        for(int rows = 0; rows < hprime.rows(); rows++){
+            for(int cols = 0; cols < hprime.cols(); cols++){
+                assert(k_hprime.at(rows,cols) == hprime.at(rows,cols));
+                assert(k_cprime.at(rows,cols) == cprime.at(rows,cols));
+            }
+        }
+
+
         uint64_t time = tm.read();
         if (i < 5)
             continue;
