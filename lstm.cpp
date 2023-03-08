@@ -433,6 +433,12 @@ sigmoid(float x)
     return 1/(1+std::exp(-x));
 }
 
+static inline float
+sigmoid_in(float x)
+{
+    return 1/(1+std::exp(-x));
+}
+
 static
 void kernel_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
                  const Matrix<float>& x, const Matrix<float>& h, const Matrix<float>& c,
@@ -485,13 +491,36 @@ size_t xsize = x.cols();
     const VectorView<float> bo(biases, 2*hsize, hsize);
     const VectorView<float> bc(biases, 3*hsize, hsize);
 
-    auto f = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wf), serial_matmul(x, Uf), bf, sigmoid);
-    auto i = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wi), serial_matmul(x, Ui), bi, sigmoid);
-    auto o = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wo), serial_matmul(x, Uo), bo, sigmoid);
-    auto tmp = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wc), serial_matmul(x, Uc), bc, std::tanh);
-    cprime = serial_cwise_add(serial_cwise_mul(f, c), serial_cwise_mul(i, tmp));
-    hprime = serial_cwise_mul(o, serial_cwise_unary_op(cprime, std::tanh));
+    // auto f = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wf), serial_matmul(x, Uf), bf, sigmoid);
+    // auto i = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wi), serial_matmul(x, Ui), bi, sigmoid);
+    // auto tmp = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wc), serial_matmul(x, Uc), bc, std::tanh);
+    // cprime = cwise_add(cwise_mul(f, c), cwise_mul(i, tmp));
+    // auto o = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wo), serial_matmul(x, Uo), bo, sigmoid);
+    // hprime = cwise_mul(o, cwise_unary_op(cprime, std::tanh));
 
+    // assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
+    // Matrix<float> m3(m1.rows(), m1.cols());
+
+    Matrix<float> m1 = serial_matmul(h, Wf);
+    Matrix<float> m2 = serial_matmul(x, Uf);
+    Matrix<float> m3 = serial_matmul(h, Wi);
+    Matrix<float> m4 = serial_matmul(x, Ui);
+    Matrix<float> m5 = serial_matmul(h, Wc);
+    Matrix<float> m6 = serial_matmul(x, Uc);
+    Matrix<float> m7 = serial_matmul(h, Wc);
+    Matrix<float> m8 = serial_matmul(x, Uc);
+    for (size_t i = 0; i < m1.rows(); i ++) {
+        for (size_t j = 0; j < m1.cols(); j += 1) {
+            float f = sigmoid_in(m1.at(i,j) + m2.at(i,j) + bf.at(j));
+            float i_ = sigmoid_in(m3.at(i,j) + m4.at(i,j) + bi.at(j));
+            float tmp = std::tanh(m7.at(i,j) + m8.at(i,j) + bc.at(j));
+            float cp = f*c.at(i,j) + i_*tmp;
+            cprime.at(i,j) = cp;
+            float o = sigmoid_in(m5.at(i,j) + m6.at(i,j) + bo.at(j));
+            hprime.at(i,j) = o * std::tanh(cp);
+        }
+    }
+    
 // END YOUR CODE HERE
 }
 
