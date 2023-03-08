@@ -234,6 +234,86 @@ public:
 
 // Add any constant, define, class or struct type that you find useful
 
+static Matrix<float>
+fused_add_broadcast_add_second_unary_op(const MatrixView<float>& m1, const MatrixView<float>& m2, const VectorView<float>& v, float(*op)(float))
+{
+    assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
+    Matrix<float> m3(m1.rows(), m1.cols());
+
+    for (size_t i = 0; i < m1.rows(); i ++) {
+        for (size_t j = 0; j < m1.cols(); j ++) {
+            m3.at(i, j) = op(m1.at(i, j) + m2.at(i, j) + v.at(j));
+        }
+    }
+
+    return m3;
+}
+
+static Matrix<float>
+serial_matmul(const MatrixView<float>& m1, const MatrixView<float>& m2)
+{
+    static const int BLOCK_SIZE = 16;
+
+    assert(m1.cols() == m2.rows());
+    Matrix<float> m3(m1.rows(), m2.cols());
+    m3.set_zero();
+
+    for (size_t i = 0; i < m1.rows(); i += BLOCK_SIZE) {
+        for (size_t j = 0; j < m2.cols(); j += BLOCK_SIZE) {
+            for (size_t k = 0; k < m2.rows(); k ++) {
+                for (size_t ii = i; ii < std::min(m1.rows(), i+BLOCK_SIZE); ii++) {
+                    for (size_t jj = j; jj < std::min(m2.cols(), j+BLOCK_SIZE); jj++) {
+                        m3.at(ii, jj) += m1.at(ii, k) * m2.at(k, jj);
+                    }
+                }
+            }
+        }
+    }
+
+    return m3;
+}
+static Matrix<float>
+serial_cwise_add(const MatrixView<float>& m1, const MatrixView<float>& m2)
+{
+    assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
+    Matrix<float> m3(m1.rows(), m1.cols());
+
+    for (size_t i = 0; i < m1.rows(); i ++) {
+        for (size_t j = 0; j < m1.cols(); j ++) {
+            m3.at(i, j) = m1.at(i, j) + m2.at(i, j);
+        }
+    }
+
+    return m3;
+}
+
+static Matrix<float>
+serial_cwise_mul(const MatrixView<float>& m1, const MatrixView<float>& m2)
+{
+    assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
+    Matrix<float> m3(m1.rows(), m1.cols());
+
+    for (size_t i = 0; i < m1.rows(); i ++) {
+        for (size_t j = 0; j < m1.cols(); j ++) {
+            m3.at(i, j) = m1.at(i, j) * m2.at(i, j);
+        }
+    }
+
+    return m3;
+}
+static Matrix<float>
+serial_cwise_unary_op(const MatrixView<float>& m, float(*op)(float))
+{
+    Matrix<float> m2(m.rows(), m.cols());
+
+    for (size_t i = 0; i < m.rows(); i ++) {
+        for (size_t j = 0; j < m.cols(); j ++) {
+            m2.at(i, j) = op(m.at(i, j));
+        }
+    }
+
+    return m2;
+}
 // (optional) END YOUR CODE HERE
 
 static Matrix<float>
@@ -364,7 +444,27 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
 {
 // BEGIN YOUR CODE HERE
 
-// Write the serial implementation of LSTM here
+size_t xsize = x.cols();
+    size_t hsize = h.cols();
+    const MatrixView<float> Wf(weights, 0, 0, hsize, hsize);
+    const MatrixView<float> Wi(weights, 0, hsize, hsize, hsize);
+    const MatrixView<float> Wo(weights, 0, 2*hsize, hsize, hsize);
+    const MatrixView<float> Wc(weights, 0, 3*hsize, hsize, hsize);
+    const MatrixView<float> Uf(weights, hsize, 0, xsize, hsize);
+    const MatrixView<float> Ui(weights, hsize, hsize, xsize, hsize);
+    const MatrixView<float> Uo(weights, hsize, 2*hsize, xsize, hsize);
+    const MatrixView<float> Uc(weights, hsize, 3*hsize, xsize, hsize);
+    const VectorView<float> bf(biases, 0, hsize);
+    const VectorView<float> bi(biases, hsize, hsize);
+    const VectorView<float> bo(biases, 2*hsize, hsize);
+    const VectorView<float> bc(biases, 3*hsize, hsize);
+
+    auto f = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wf), serial_matmul(x, Uf), bf, sigmoid);
+    auto i = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wi), serial_matmul(x, Ui), bi, sigmoid);
+    auto o = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wo), serial_matmul(x, Uo), bo, sigmoid);
+    auto tmp = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wc), serial_matmul(x, Uc), bc, std::tanh);
+    cprime = serial_cwise_add(serial_cwise_mul(f, c), serial_cwise_mul(i, tmp));
+    hprime = serial_cwise_mul(o, serial_cwise_unary_op(cprime, std::tanh));
 
 // END YOUR CODE HERE
 }
@@ -412,8 +512,9 @@ int main(int argc, const char** argv)
 
         Timer tm(CLOCK_MONOTONIC);
 
-        kernel_lstm(weights, biases, x, h, c, hprime, cprime);
-
+        //kernel_lstm(weights, biases, x, h, c, hprime, cprime);
+        serial_lstm(weights, biases, x, h, c, hprime, cprime);
+        
         uint64_t time = tm.read();
         if (i < 5)
             continue;
