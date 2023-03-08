@@ -272,9 +272,25 @@ serial_matmul(const MatrixView<float>& m1, const MatrixView<float>& m2)
         for (size_t j = 0; j < m2.cols(); j += BLOCK_SIZE) {
             for (size_t k = 0; k < m2.rows(); k ++) {
                 for (size_t ii = i; ii < std::min(m1.rows(), i+BLOCK_SIZE); ii++) {
-                    for (size_t jj = j; jj < std::min(m2.cols(), j+BLOCK_SIZE); jj++) {
-                        m3.at(ii, jj) += m1.at(ii, k) * m2.at(k, jj);
-                    }
+                    //for (size_t jj = j; jj < std::min(m2.cols(), j+BLOCK_SIZE); jj++) {
+                    //this unrolling depends on BLOCK_SIZE above
+                    m3.at(ii, j) += m1.at(ii, k) * m2.at(k, j);
+                    m3.at(ii, j+1) += m1.at(ii, k) * m2.at(k, j+1);
+                    m3.at(ii, j+2) += m1.at(ii, k) * m2.at(k, j+2);
+                    m3.at(ii, j+3) += m1.at(ii, k) * m2.at(k, j+3);
+                    m3.at(ii, j+4) += m1.at(ii, k) * m2.at(k, j+4);
+                    m3.at(ii, j+5) += m1.at(ii, k) * m2.at(k, j+5);
+                    m3.at(ii, j+6) += m1.at(ii, k) * m2.at(k, j+6);
+                    m3.at(ii, j+7) += m1.at(ii, k) * m2.at(k, j+7);
+                    m3.at(ii, j+8) += m1.at(ii, k) * m2.at(k, j+8);
+                    m3.at(ii, j+9) += m1.at(ii, k) * m2.at(k, j+9);
+                    m3.at(ii, j+10) += m1.at(ii, k) * m2.at(k, j+10);
+                    m3.at(ii, j+11) += m1.at(ii, k) * m2.at(k, j+11);
+                    m3.at(ii, j+12) += m1.at(ii, k) * m2.at(k, j+12);
+                    m3.at(ii, j+13) += m1.at(ii, k) * m2.at(k, j+13);
+                    m3.at(ii, j+14) += m1.at(ii, k) * m2.at(k, j+14);
+                    m3.at(ii, j+15) += m1.at(ii, k) * m2.at(k, j+15);
+                    //}
                 }
             }
         }
@@ -335,7 +351,7 @@ matmul(const MatrixView<float>& m1, const MatrixView<float>& m2)
     Matrix<float> m3(m1.rows(), m2.cols());
     m3.set_zero();
 
-#pragma omp parallel for collapse(2)
+//#pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m1.rows(); i += BLOCK_SIZE) {
         for (size_t j = 0; j < m2.cols(); j += BLOCK_SIZE) {
             for (size_t k = 0; k < m2.rows(); k ++) {
@@ -355,7 +371,7 @@ cwise_unary_op(const MatrixView<float>& m, float(*op)(float))
 {
     Matrix<float> m2(m.rows(), m.cols());
 
-#pragma omp parallel for collapse(2)
+//#pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m.rows(); i ++) {
         for (size_t j = 0; j < m.cols(); j ++) {
             m2.at(i, j) = op(m.at(i, j));
@@ -370,7 +386,7 @@ cwise_add(const MatrixView<float>& m1, const MatrixView<float>& m2)
     assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
     Matrix<float> m3(m1.rows(), m1.cols());
 
-#pragma omp parallel for collapse(2)
+//#pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m1.rows(); i ++) {
         for (size_t j = 0; j < m1.cols(); j ++) {
             m3.at(i, j) = m1.at(i, j) + m2.at(i, j);
@@ -385,7 +401,7 @@ cwise_mul(const MatrixView<float>& m1, const MatrixView<float>& m2)
     assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
     Matrix<float> m3(m1.rows(), m1.cols());
 
-#pragma omp parallel for collapse(2)
+//#pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m1.rows(); i ++) {
         for (size_t j = 0; j < m1.cols(); j ++) {
             m3.at(i, j) = m1.at(i, j) * m2.at(i, j);
@@ -402,7 +418,7 @@ broadcast_add_second(const MatrixView<float>& m, const VectorView<float>& v)
     assert(m.cols() == v.size());
     Matrix<float> m2(m.rows(), m.cols());
 
-#pragma omp parallel for collapse(2)
+//#pragma omp parallel for collapse(2)
     for (size_t i = 0; i < m.rows(); i ++) {
         for (size_t j = 0; j < m.cols(); j ++) {
             m2.at(i, j) = m.at(i, j) + v.at(j);
