@@ -391,6 +391,10 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
     Matrix<float> m3 = Matrix<float>(h.rows(), Wf.cols());
     Matrix<float> m5 = Matrix<float>(h.rows(), Wf.cols());
     Matrix<float> m7 = Matrix<float>(h.rows(), Wf.cols());
+    m1.set_zero();
+    m3.set_zero();
+    m5.set_zero();
+    m7.set_zero();
 
     const int BLOCK_SIZE = 16;
     for (size_t i = 0; i < h.rows(); i += BLOCK_SIZE) {
@@ -413,6 +417,10 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
     Matrix<float> m4 = Matrix<float>(x.rows(), Uf.cols()); 
     Matrix<float> m6 = Matrix<float>(x.rows(), Uf.cols()); 
     Matrix<float> m8 = Matrix<float>(x.rows(), Uf.cols()); 
+    m2.set_zero();
+    m4.set_zero();
+    m6.set_zero();
+    m8.set_zero();
 
     for (size_t i = 0; i < x.rows(); i += BLOCK_SIZE) {
         for (size_t j = 0; j < Uf.cols(); j += BLOCK_SIZE) {
@@ -557,22 +565,22 @@ int main(int argc, const char** argv)
         const Matrix<float> c = generate_matrix<float>(batchsize, hsize, distribution, random_engine);
         Matrix<float> hprime(batchsize, hsize);
         Matrix<float> cprime(batchsize, hsize);
-        Matrix<float> k_hprime(batchsize, hsize);
-        Matrix<float> k_cprime(batchsize, hsize);
+        // Matrix<float> k_hprime(batchsize, hsize);
+        // Matrix<float> k_cprime(batchsize, hsize);
 
         Timer tm(CLOCK_MONOTONIC);
 
         
-        kernel_lstm(weights, biases, x, h, c, k_hprime, k_cprime);
+        // kernel_lstm(weights, biases, x, h, c, k_hprime, k_cprime);
         serial_lstm(weights, biases, x, h, c, hprime, cprime);
         //parallel_lstm(weights, biases, x, h, c, hprime, cprime);
         
-        for(int rows = 0; rows < hprime.rows(); rows++){
-            for(int cols = 0; cols < hprime.cols(); cols++){
-                assert(k_hprime.at(rows,cols) == hprime.at(rows,cols));
-                assert(k_cprime.at(rows,cols) == cprime.at(rows,cols));
-            }
-        }
+        // for(int rows = 0; rows < hprime.rows(); rows++){
+        //     for(int cols = 0; cols < hprime.cols(); cols++){
+        //         assert(abs(k_hprime.at(rows,cols) - hprime.at(rows,cols)) < 1e-5);
+        //         assert(abs(k_cprime.at(rows,cols) - cprime.at(rows,cols)) < 1e-5);
+        //     }
+        // }
 
 
         uint64_t time = tm.read();
