@@ -235,31 +235,6 @@ public:
 // Add any constant, define, class or struct type that you find useful
 
 static Matrix<float>
-fused_add_broadcast_add_second_unary_op(const MatrixView<float>& m1, const MatrixView<float>& m2, const VectorView<float>& v, float(*op)(float))
-{
-    static const int unroll = 10;
-    assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
-    Matrix<float> m3(m1.rows(), m1.cols());
-
-    for (size_t i = 0; i < m1.rows(); i ++) {
-        for (size_t j = 0; j < m1.cols(); j += unroll) {
-            m3.at(i, j) = op(m1.at(i, j) + m2.at(i, j) + v.at(j));
-            m3.at(i, j+1) = op(m1.at(i, j+1) + m2.at(i, j+1) + v.at(j+1));
-            m3.at(i, j+2) = op(m1.at(i, j+2) + m2.at(i, j+2) + v.at(j+2));
-            m3.at(i, j+3) = op(m1.at(i, j+3) + m2.at(i, j+3) + v.at(j+3));
-            m3.at(i, j+4) = op(m1.at(i, j+4) + m2.at(i, j+4) + v.at(j+4));
-            m3.at(i, j+5) = op(m1.at(i, j+5) + m2.at(i, j+5) + v.at(j+5));
-            m3.at(i, j+6) = op(m1.at(i, j+6) + m2.at(i, j+6) + v.at(j+6));
-            m3.at(i, j+7) = op(m1.at(i, j+7) + m2.at(i, j+7) + v.at(j+7));
-            m3.at(i, j+8) = op(m1.at(i, j+8) + m2.at(i, j+8) + v.at(j+8));
-            m3.at(i, j+9) = op(m1.at(i, j+9) + m2.at(i, j+9) + v.at(j+9));
-        }
-    }
-
-    return m3;
-}
-
-static Matrix<float>
 serial_matmul(const MatrixView<float>& m1, const MatrixView<float>& m2)
 {
     static const int BLOCK_SIZE = 16;
@@ -447,6 +422,7 @@ void kernel_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
     // unpack the packed weights
     size_t xsize = x.cols();
     size_t hsize = h.cols();
+    
     const MatrixView<float> Wf(weights, 0, 0, hsize, hsize);
     const MatrixView<float> Wi(weights, 0, hsize, hsize, hsize);
     const MatrixView<float> Wo(weights, 0, 2*hsize, hsize, hsize);
@@ -459,7 +435,8 @@ void kernel_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
     const VectorView<float> bi(biases, hsize, hsize);
     const VectorView<float> bo(biases, 2*hsize, hsize);
     const VectorView<float> bc(biases, 3*hsize, hsize);
-
+    
+    
     auto f = cwise_unary_op(broadcast_add_second(cwise_add(matmul(h, Wf), matmul(x, Uf)), bf), sigmoid);
     auto i = cwise_unary_op(broadcast_add_second(cwise_add(matmul(h, Wi), matmul(x, Ui)), bi), sigmoid);
     auto o = cwise_unary_op(broadcast_add_second(cwise_add(matmul(h, Wo), matmul(x, Uo)), bo), sigmoid);
@@ -476,7 +453,7 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
 {
 // BEGIN YOUR CODE HERE
 
-size_t xsize = x.cols();
+    size_t xsize = x.cols();
     size_t hsize = h.cols();
     const MatrixView<float> Wf(weights, 0, 0, hsize, hsize);
     const MatrixView<float> Wi(weights, 0, hsize, hsize, hsize);
@@ -508,7 +485,40 @@ size_t xsize = x.cols();
     Matrix<float> m5 = serial_matmul(h, Wc);
     Matrix<float> m6 = serial_matmul(x, Uc);
     Matrix<float> m7 = serial_matmul(h, Wc);
-    Matrix<float> m8 = serial_matmul(x, Uc);
+    Matrix<float> m8 = serial_matmul(h, Uc);
+
+    const int BLOCK_SIZE = 16;
+    for (size_t i = 0; i < h.rows(); i += BLOCK_SIZE) {
+        for (size_t j = 0; j < Wf.cols(); j += BLOCK_SIZE) {
+            for (size_t k = 0; k < Wf.rows(); k ++) {
+                for (size_t ii = i; ii < std::min(h.rows(), i+BLOCK_SIZE); ii++) {
+                    for (size_t jj = j; jj < std::min(Wf.cols(), j+BLOCK_SIZE); jj++) {
+                        m1.at(ii, jj) += h.at(ii, k) * Wf.at(k, jj);
+                        m3.at(ii, jj) += h.at(ii, k) * Wi.at(k, jj);
+                        m5.at(ii, jj) += h.at(ii, k) * Wo.at(k, jj);
+                        m7.at(ii, jj) += h.at(ii, k) * Wc.at(k, jj);
+                    }
+                }
+            }
+        }
+    }
+    
+
+    for (size_t i = 0; i < x.rows(); i += BLOCK_SIZE) {
+        for (size_t j = 0; j < Uf.cols(); j += BLOCK_SIZE) {
+            for (size_t k = 0; k < Uf.rows(); k ++) {
+                for (size_t ii = i; ii < std::min(x.rows(), i+BLOCK_SIZE); ii++) {
+                    for (size_t jj = j; jj < std::min(Uf.cols(), j+BLOCK_SIZE); jj++) {
+                        m2.at(ii, jj) += x.at(ii, k) * Uf.at(k, jj);
+                        m4.at(ii, jj) += x.at(ii, k) * Ui.at(k, jj);
+                        m6.at(ii, jj) += x.at(ii, k) * Uo.at(k, jj);
+                        m8.at(ii, jj) += x.at(ii, k) * Uc.at(k, jj);
+                    }
+                }
+            }
+        }
+    }
+
     for (size_t i = 0; i < m1.rows(); i ++) {
         for (size_t j = 0; j < m1.cols(); j += 1) {
             float f = sigmoid_in(m1.at(i,j) + m2.at(i,j) + bf.at(j));
