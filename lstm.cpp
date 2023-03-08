@@ -387,16 +387,6 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
     const VectorView<float> bo(biases, 2*hsize, hsize);
     const VectorView<float> bc(biases, 3*hsize, hsize);
 
-    // auto f = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wf), serial_matmul(x, Uf), bf, sigmoid);
-    // auto i = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wi), serial_matmul(x, Ui), bi, sigmoid);
-    // auto tmp = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wc), serial_matmul(x, Uc), bc, std::tanh);
-    // cprime = cwise_add(cwise_mul(f, c), cwise_mul(i, tmp));
-    // auto o = fused_add_broadcast_add_second_unary_op(serial_matmul(h, Wo), serial_matmul(x, Uo), bo, sigmoid);
-    // hprime = cwise_mul(o, cwise_unary_op(cprime, std::tanh));
-
-    // assert(m1.rows() == m2.rows() && m1.cols() == m2.cols());
-    // Matrix<float> m3(m1.rows(), m1.cols());
-
     Matrix<float> m1 = Matrix<float>(h.rows(), Wf.cols());
     Matrix<float> m3 = Matrix<float>(h.rows(), Wf.cols());
     Matrix<float> m5 = Matrix<float>(h.rows(), Wf.cols());
@@ -407,8 +397,8 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
         for (size_t j = 0; j < Wf.cols(); j += BLOCK_SIZE) {
             for (size_t k = 0; k < Wf.rows(); k ++) {
                 for (size_t ii = i; ii < std::min(h.rows(), i+BLOCK_SIZE); ii++) {
+                    float hval = h.at(ii,k);
                     for (size_t jj = j; jj < std::min(Wf.cols(), j+BLOCK_SIZE); jj++) {
-                        float hval = h.at(ii,k);
                         m1.at(ii, jj) += hval * Wf.at(k, jj);
                         m3.at(ii, jj) += hval * Wi.at(k, jj);
                         m5.at(ii, jj) += hval * Wo.at(k, jj);
@@ -428,8 +418,8 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
         for (size_t j = 0; j < Uf.cols(); j += BLOCK_SIZE) {
             for (size_t k = 0; k < Uf.rows(); k ++) {
                 for (size_t ii = i; ii < std::min(x.rows(), i+BLOCK_SIZE); ii++) {
+                    float xval = x.at(ii, k);
                     for (size_t jj = j; jj < std::min(Uf.cols(), j+BLOCK_SIZE); jj++) {
-                        float xval = x.at(ii, k);
                         m2.at(ii, jj) += xval * Uf.at(k, jj);
                         m4.at(ii, jj) += xval * Ui.at(k, jj);
                         m6.at(ii, jj) += xval * Uo.at(k, jj);
