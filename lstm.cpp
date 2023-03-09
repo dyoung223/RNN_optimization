@@ -396,7 +396,7 @@ void serial_lstm(const Matrix<float>& weights, const std::vector<float>& biases,
     m5.set_zero();
     m7.set_zero();
 
-    const int BLOCK_SIZE = 16;
+    const int BLOCK_SIZE = 64;
     for (size_t i = 0; i < h.rows(); i += BLOCK_SIZE) {
         for (size_t j = 0; j < Wf.cols(); j += BLOCK_SIZE) {
             for (size_t k = 0; k < Wf.rows(); k ++) {
@@ -484,9 +484,9 @@ void parallel_lstm(const Matrix<float>& weights, const std::vector<float>& biase
     m5.set_zero();
     m7.set_zero();
 
-    const int BLOCK_SIZE = 16;
+    const int BLOCK_SIZE = 64;
 
-#pragma omp parallel for collapse(3)
+#pragma omp parallel for collapse(1)
     for (size_t i = 0; i < h.rows(); i += BLOCK_SIZE) {
         for (size_t j = 0; j < Wf.cols(); j += BLOCK_SIZE) {
             for (size_t k = 0; k < Wf.rows(); k ++) {
@@ -512,7 +512,7 @@ void parallel_lstm(const Matrix<float>& weights, const std::vector<float>& biase
     m6.set_zero();
     m8.set_zero();
 
-#pragma omp parallel for collapse(3)
+#pragma omp parallel for collapse(1)
     for (size_t i = 0; i < x.rows(); i += BLOCK_SIZE) {
         for (size_t j = 0; j < Uf.cols(); j += BLOCK_SIZE) {
             for (size_t k = 0; k < Uf.rows(); k ++) {
@@ -580,8 +580,8 @@ int main(int argc, const char** argv)
 
         
         // kernel_lstm(weights, biases, x, h, c, k_hprime, k_cprime);
-        //serial_lstm(weights, biases, x, h, c, hprime, cprime);
-        parallel_lstm(weights, biases, x, h, c, hprime, cprime);
+        serial_lstm(weights, biases, x, h, c, hprime, cprime);
+        //parallel_lstm(weights, biases, x, h, c, hprime, cprime);
         
         // for(int rows = 0; rows < hprime.rows(); rows++){
         //     for(int cols = 0; cols < hprime.cols(); cols++){
